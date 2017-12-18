@@ -1,8 +1,17 @@
 
-   /*
+   /*************************************************************************************
         function below is a constructor... use with "new" key word.
-        BLAH!
-    */
+        
+          Example:    var orvObjLib = new OrvObjLib();
+          
+          ---------------------------------------------
+          
+          Project Location on Github:    https://github.com/OrvilleChomer/orvObjLib
+          Project Info on my Blog:
+          
+          
+        Version used for Production code should be minified (of course).
+    *************************************************************************************/
 	function OrvObjLib() {
 		var alteredObjsByIndex = [];
 		var alteredObjsByKey = [];
@@ -10,7 +19,7 @@
 		var self = this;
 		var nNextKeyNum = 0;
 		var serializedObj;
-		var bDontCopyMethods = true;
+		var bCopyMethods = false;
 		var bProduceMinifiedResults = false;		
 		var sPiDbName = "defaultDb";
 
@@ -19,6 +28,12 @@
 	    
 	    
 	   /*******************************************************************************
+	       Used to clone JavaScript objects or arrays.
+	       
+	       First, it tries to use native functionality...
+	       If there aren't any circular references, it will work, and it will work faster!
+	       
+	       If it does Not work... it uses this library to do the work!
 	    *******************************************************************************/	    
 	    self.cloneObj = function(inputObj) {
 	    	var outputObj;
@@ -48,6 +63,8 @@
 			var commands,cmd;
 			var bRootObjSet = false;
 			var obj,arr;
+			
+			resultObj.deserializationDate = new Date();
 			
 			nodesByKey = [];  // clear out anything there Might have been from before
 			
@@ -108,11 +125,16 @@
 
 			resultObj.completionTimestamp = new Date();
 			
+			// how long did it take?
+			resultObj.totalMs = getMsDif(resultObj.deserializationDate, resultObj.completionTimestamp);
+			
 			return resultObj;
 		} // end of method deserializeObj()
 		
 		
 	   /*******************************************************************************
+	       Must be used on a JSON string that was created from a serialized
+	       object.
 	    *******************************************************************************/		
 		self.deserializeJsonString = function(sJson) {
 			var objWork = JSON.parse(sJson);
@@ -121,7 +143,50 @@
 		} // end of method deserializeJsonString()	
 				
 				
+				
 		
+	   /*******************************************************************************
+	   
+	   	   This method is used to load an object out of a local indexedDb
+	   	   database based on the database its in... and the object's primary key.
+	   	   
+	       use: orvObjLib.loadObjFromDb(params).onsuccess = function(obj, [info]) {
+	       } 
+	    *******************************************************************************/
+	    self.loadObjFromDb = function(params) {
+	    } // end of method loadObjFromDb()	
+		
+		
+	   /*******************************************************************************
+	       Merges data from one complex object into the data of another complex
+	       object.
+	       
+	       Primary Key Defs param is an Array.
+	       
+	       Sample primary key defs:
+	           {"objPropName": "customer", "pkPropName": "custId"}
+	           {"objPropName": "dealSections", "pkPropName": "dealSectionId"}
+	    *******************************************************************************/		
+		self.merge = function(params) {
+			var dataFromObj = params.dataFromObj;
+			var objBeingModified = params.intoThisObj;
+			var primaryKeyDefs = params.usingPrimaryKeyDefs;
+			
+		} // end of method merge()
+		
+		
+		
+		
+	   /*******************************************************************************
+	   
+	   	   Takes JSON created from object that was serialized,
+	   	   and returns a copy of the original object (or array)
+	    *******************************************************************************/
+	    self.parse = function(sJson) {
+	    	var objWork = self.deserializeJsonString(sJson);
+	    	
+	    	return objWork.output;
+	    } // end of method loadObjFromDb()			
 		
 		
 	   /*******************************************************************************
@@ -132,10 +197,12 @@
 		self.saveObjToDb = function(params) {
 			var inputObj = params.inputObj;
 			var sKey = params.key;
-			var sDbName = params.dbName;
+			var sDbName = params.dbName;  // sPiDbName - fix code later
 			var objToSave = self.deserializeObj(inputObj);
 			
 		} // end of method saveObjToDb()
+		
+		
 		
 		
 	   /*******************************************************************************
@@ -176,6 +243,7 @@
 			
 			// top level was not an object or array so we are aborting this operation
 			if (!bRootNodeAdded) {
+				addError("Input parameter is neither a JS Object or a Js Array", "usage");
 				serializedObj.status = "aborted";
 				return serializedObj;
 			} // end if
@@ -191,7 +259,9 @@
 			clearObjMarkers(inputObj);
 			cleanupWork(inputObj); 
 			
-			serializedObj.status = "completed";
+			// how long did it take?
+			serializedObj.totalMs = getMsDif(serializedObj.serializationDate, serializedObj.completionTimestamp);
+
 			
 			return serializedObj;
 		} // end of method serializeObj()
@@ -211,22 +281,26 @@
 		
 	   /*******************************************************************************
 	    *******************************************************************************/		
-		self.setDontCopyMethods = function(bSetting) {
-			bDontCopyMethods = bSetting;
-		} // end of method
+		self.setCopyMethods = function(bSetting) {
+			bCopyMethods = bSetting;
+		} // end of method self.setCopyMethods()
 		
 		
 	   /*******************************************************************************
 	    *******************************************************************************/		
 		self.sortArrayOfObjects = function(params) {
-		} // end of method
+		} // end of method self.sortArrayOfObjects()
 		
 		
 	   /*******************************************************************************
+	       Serializes and stringifies your object or array all in one shot!
 	    *******************************************************************************/		
-		self.stringifyObj = function(inputObj) {
+		self.stringify = function(inputObj) {
 			return JSON.stringify(self.serializeObj(inputObj));
 		} // end of method stringifyObj()
+		
+		
+		
 		
 		
 		// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -270,7 +344,19 @@
 	   /*******************************************************************************
 	    *******************************************************************************/								
 		function aa_deser_addMethod(cmd, procLog) {
-			var obj = nodesByKey[cmd.ownerKey];
+			var obj = nodesByKey[cmd.ownerKey];  // object to add method to
+			var sMethodName = cmd.methodName;
+			var sArgs = cmd.args;
+			var sCode = cmd.jsCode;
+			var fn;
+			
+			if (sArgs.length === 0) {
+				fn = new Function(sCode);
+			} else {
+				fn = new Function(sArgs, sCode);
+			} // end if/else
+			
+			obj[sMethodName] = fn;
 			
 			aa_deser_log(cmd, procLog);
 		} // end of function aa_deser_addMethod()
@@ -435,12 +521,15 @@
 		function baseDeserializedObj() {
 			var obj = {};
 			
-			obj.deserializedObj = "deserializedObj";
+			initMetaData(obj, "deserializedObj", "Deserialized Object");
+
 			obj.deserializedStartTime = new Date();
 			obj.procLog = [];
 			
 			return obj;
 		} // end of function baseDeserializedObj()
+		
+		
 		
 	   /*******************************************************************************
 	   	  Returns unique key to be used for this instance of this serialization
@@ -457,6 +546,18 @@
 			nNextKeyNum = nNextKeyNum + 1;
 			return "k"+nNextKeyNum;
 		} // end of function getNextKey()
+		
+		
+	   /*******************************************************************************
+	       Returns how many milliseconds occurred between start date/time
+	       and end date/time.
+	    *******************************************************************************/		
+		function getMsDif(dtStart, dtEnd) {
+			var nDif = dtEnd.getMilliseconds() - dtStart.getMilliseconds();
+			
+			return nDif;
+		} // end of function getMsDif()
+		
 		
 		
 	   /**************************************************************
@@ -564,6 +665,31 @@
 		} // end of function keyJustCreated()
 		
 		
+		
+	   /*******************************************************************************
+	    *******************************************************************************/		
+		function initMetaData(obj, sObjTypePropName, sObjType) {
+			var shameless = {};
+			
+			obj[sObjTypePropName] = sObjType;
+			
+			obj.jsLib = "orvObjLib.js";	
+			obj.gitHubRepoUrl = "";
+			
+			shameless.author = "Orville Paul Chomer";
+			shameless.linkedInProfileUrl = "https://www.linkedin.com/in/orvillechomer/";
+			shameless.mainSiteUrl = "http://chomer.com/";
+			shameless.bioPageUrl = "http://chomer.com/";
+			shameless.about = "This block is inspired by NPR's Car Talk's 'Shameless Commerce Division!'";
+		
+			obj.shamelessSelfPromotionSection = shameless;
+
+						
+		} // end of function initMetaData()
+		
+		
+		
+		
 	   /*******************************************************************************
 	    *******************************************************************************/		
 		function initSerializedObj() {
@@ -571,11 +697,9 @@
 			serializedObj.serializationDate = new Date();
 			
 			// meta data:
-			serializedObj.serializedObj = "Serialized Object";
-			serializedObj.jsLib = "orvObjLib.js";	
-			serializedObj.author = "Orville Paul Chomer";
+			initMetaData(serializedObj, "serializedObj", "Serialized Object");
+
 			serializedObj.status = "starting";
-			serializedObj.linkedInProfileUrl = "https://www.linkedin.com/in/orvillechomer/";
 			
 			// will contain instructions for deserializer to
 			// use to do its work...
@@ -613,9 +737,30 @@
 		
 	   /*******************************************************************************
 	    *******************************************************************************/					
-		function makeAddMethodCommand(sMethodName,sArgs,sCode,sOwnerKey) {
-			var cmd = {"cmd":"add-method", "methodName":sMethodName,
-			           "args":sArgs,"jsCode":sCode};
+		function makeAddMethodCommand(sMethodName, vValue, sOwnerKey) {
+			var cmd,nPos,sArgs,sCode,n;
+			var sWork = vValue.toString();
+			
+			nPos = sWork.indexOf("(");
+			sWork = sWork.substr(nPos+1, sWork.length-nPos);
+			nPos = sWork.indexOf(")");
+			sArgs = sWork.substr(0,nPos);
+			sWork = sWork.substr(nPos+1, sWork.length-nPos);
+			nPos = sWork.indexOf("{");
+			sCode = sWork.substr(nPos+1, sWork.length-nPos);
+			
+			for (n=sCode.length;n>-1;n=n-1) {
+				if (sCode.substr(n,1)==="}") {
+					sCode = sCode.substr(0, n); 
+					break;
+				} // end if
+			} // next n
+			
+			cmd = {"cmd":"add-method", 
+			       "ownerKey": sOwnerKey, 
+			       "methodName":sMethodName,
+			       "args":sArgs,
+			       "jsCode":sCode};
 			
 			addCreationInstruction(cmd);
 		} // end of function makeAddMethodCommand()
@@ -864,7 +1009,7 @@
 			var sMemberName;
 			var vMemberValue;
 			var objsAndArraysToProcByIndex = []; //?
-			var sDataType,sKey,n,nMax;
+			var sDataType,sKey,n,nMax,sArgs,sCode,sWork,nPos;
 			var sCurrentObjKey = setObjKey(inputObj);
 			
 			if (hasBeenProcessed(inputObj)) {
@@ -899,7 +1044,9 @@
 							makeAddArrayPropertyCommand(sMemberName, sCurrentObjKey, sKey);
 							break;
 						case "method":
-							//right now, we will skip methods completely!
+							if (bCopyMethods) {
+								makeAddMethodCommand(sMemberName, vMemberValue, sCurrentObjKey);							
+							} // end if (bCopyMethods) 
 							break;
 						case "date":
 							makeAddDatePropertyCommand(sMemberName, vMemberValue, sCurrentObjKey);
