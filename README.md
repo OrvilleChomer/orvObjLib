@@ -1,2 +1,2 @@
 # orvObjLib JavaScript Library Notes
-Testing this functionality.
+Check out the wiki here to get more details...
