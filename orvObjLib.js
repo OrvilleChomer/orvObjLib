@@ -29,6 +29,10 @@
           
           01/03/2018      Added support for "freeze", "seal",                    .003
                           "preventExtensions"
+                          
+          01/14/2018      Changed method name:  "setCopyMethods()"   to:         .004
+                          "setCopyMethodsFlagTo()"
+                          to make its use more clear.
           
           
         ************************************************************************** 
@@ -355,8 +359,11 @@
 		
 		
 	   /*******************************************************************************
+	       Set boolean flag to either true or false for copying (serializing)
+	       any methods that may be part of the input object.
+	       ... the default value is (false).
 	    *******************************************************************************/		
-		self.setCopyMethods = function(bSetting) {
+		self.setCopyMethodsFlagTo = function(bSetting) {
 			bCopyMethods = bSetting;
 		} // end of method self.setCopyMethods()
 		
@@ -1541,5 +1548,3 @@
 		// **** END OF PRIVATE FUNCTIONS
 			
 	} // end of function orvObjLibObj(n)  --- (outer function)
-	
-	
